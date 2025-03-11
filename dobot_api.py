@@ -250,11 +250,11 @@ class DobotApiDashboard(DobotApi):
         string = 'EnableRobot('
         if load != 0:
             string = string + "{:f}".format(load)
-            iDobotApiDashMove= 0 or centerY != 0 or centerZ != 0:
-                string = string + ",{:f},{:f},{:f}".format(
-                    centerX, centerY, centerZ)
-                if isCheck != -1:
-                    string = string + ",{:d}".format(isCheck)
+            iDobotApiDashMove= 0 or centerY != 0 or centerZ != 0
+            string = string + ",{:f},{:f},{:f}".format(
+                centerX, centerY, centerZ)
+            if isCheck != -1:
+                string = string + ",{:d}".format(isCheck)
         string = string + ')'
         return self.sendRecvMsg(string)
 
