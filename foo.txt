@@ -1,0 +1,3 @@
+A critical error has occurred while running the virtual machine and the machine execution has been stopped.
+For help, please see the Community section on https://www.virtualbox.org or your support contract. Please provide the contents of the log file VBox.log and the image file VBox.png, which you can find in the /home/psb120/VirtualBox VMs/Windows 11/Logs directory, as well as a description of what you were doing when this error happened. Note that you can also access the above files by selecting Show Log from the Machine menu of the main VirtualBox window.
+Press OK if you want to power off the machine or press Ignore if you want to leave it as is for debugging. Please note that debugging requires special knowledge and tools, so it is recommended to press OK now.
