@@ -1891,6 +1891,7 @@ class DobotApiDashboard(DobotApi):
         准。取值范围：[1, 最⼤运动速度]，单位：mm/s
         cp  int 平滑过渡⽐例，与r互斥。取值范围：[0,100]
         r   int 平滑过渡半径，与cp互斥，若同时存在以r为准。单位：mm
+        
         Description
         Move from the current position to the target position in a linear mode.
         Required parameter:
