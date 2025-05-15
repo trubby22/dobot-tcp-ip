@@ -180,7 +180,7 @@ class DobotApi:
             try:
                 self.socket_dobot.shutdown(socket.SHUT_RDWR)
                 self.socket_dobot.close()
-            except socket.error as e:
+            except Exception as e:
                 print(f"Error while closing socket: {e}")
 
     def sendRecvMsg(self, string):

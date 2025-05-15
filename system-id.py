@@ -2,6 +2,7 @@ from dobot_api import DobotApiFeedBack,DobotApiDashboard
 import threading
 import re
 import pickle
+import IPython
 
 class SystemId:
     def __init__(self):
@@ -12,12 +13,10 @@ class SystemId:
         self.f = DobotApiFeedBack(ip, feedback_port)
         self.command_path_mapping = dict()
 
-        response = self.d.RequestControl()
-        print(response)
-        response = self.d.EnableRobot()
-        print(response)
+        print(self.d.RequestControl())
+        print(self.d.EnableRobot())
 
-        threading.Thread(target=self.get_feed, daemon=True).start()
+        # threading.Thread(target=self.get_feed, daemon=True).start()
     
     def parse_result_id(self, response):
         if "Not Tcp" in response:
@@ -38,6 +37,9 @@ class SystemId:
                 feedback = self.f.feedBackData()
                 if feedback is None:
                     continue
+                with open('./feedback.pkl', 'wb') as file:
+                    pickle.dump(feedback, file)
+                raise Exception()
                 if hex((feedback['test_value'][0])) != '0x123456789abcdef':
                     continue
                 relevant_fields = [
