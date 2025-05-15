@@ -4,6 +4,7 @@ import re
 import pickle
 import IPython
 from time import sleep
+from datetime import datetime
 
 class SystemId:
     def __init__(self):
@@ -45,9 +46,12 @@ class SystemId:
         buffer_size = 100
         file_path = './feedback_all.pkl'
         data_buffer = []
+        with open(file_path, 'wb') as f:
+            pickle.dump(data_buffer, f)
         try:
             while True:
                 feedback = self.f.feedBackData()
+                now = datetime.now()
                 if feedback is None:
                     continue
                 if hex((feedback['TestValue'][0])) != '0x123456789abcdef':
@@ -55,9 +59,6 @@ class SystemId:
                 self.feedback['RobotMode'] = feedback['RobotMode'][0]
                 self.feedback['CurrentCommandId'] = feedback['CurrentCommandId'][0]
                 relevant_fields = [
-                    'SixForceValue',
-                    'ActualTCPForce',
-                    'TimeStamp',
                     'TargetQuaternion',
                     'ActualQuaternion',
                     'QTarget',
@@ -70,6 +71,7 @@ class SystemId:
                 feedback_filetred = dict()
                 for field in relevant_fields:
                     feedback_filetred[field] = feedback[field][0]
+                feedback_filetred['TimeStamp'] = now.isoformat(timespec='milliseconds')
                 data_buffer.append(feedback_filetred)
                 if len(data_buffer) >= buffer_size:
                     with open(file_path, 'ab') as f:
@@ -117,7 +119,7 @@ class SystemId:
         self.save_command_id(self.d.MovL(-350, -50, 51, 180, 0, 20, coordinateMode=0, speed=self.speed), True, path_id)
     
     def go(self):
-        n = 2
+        n = 3
         paths = [
             self.press_slide,
             # self.press_twist_x,

@@ -40,3 +40,19 @@ timestamp from dobot feedback doesn't work - it shows 1970 and it shows that the
 also, the force value readings are all 0 - maybe I need to enable force readings in settings
 
 I want to get dobot feedback and video recording simultaneously and then when I'm back home stich these 2 datasets together
+
+- obtain pose and video readings simultaneously
+
+I enabled the FT sensor via EnableFTSensor (I get status code 0) but when I run GetForce I get status code -1
+Command execution failed
+Out[3]: '-1,{},GetForce();'
+
+maybe try using the GUI
+
+it's quite likely that the force-torque readings require connecting a force-torque sensor
+so if it doesn't work after a while, just assume it won't work and move on - the force-torque sensor isn't crucial - I can rely only on tactile sensor marker deformations
+
+GUI tells me "FT sensor not connected" - so I won't be getting force-torque readings for now
+- I will talk to Dandan later about whether it makes sense to use the force-torque sensor or not
+
+one last try - no, let's not waste time - I know that FT sensing doesn't work already
