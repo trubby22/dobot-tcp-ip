@@ -3,6 +3,7 @@ import threading
 import re
 import pickle
 import IPython
+from time import sleep
 
 class SystemId:
     def __init__(self):
@@ -12,11 +13,12 @@ class SystemId:
         self.d = DobotApiDashboard(ip, dashboard_port)
         self.f = DobotApiFeedBack(ip, feedback_port)
         self.command_path_mapping = dict()
+        self.feedback = dict()
 
         print(self.d.RequestControl())
         print(self.d.EnableRobot())
 
-        # threading.Thread(target=self.get_feed, daemon=True).start()
+        threading.Thread(target=self.get_feed_small, daemon=True).start()
     
     def parse_result_id(self, response):
         if "Not Tcp" in response:
@@ -27,6 +29,16 @@ class SystemId:
     def __del__(self):
         del self.d
         del self.f
+    
+    def get_feed_small(self):
+        while True:
+            feedback = self.f.feedBackData()
+            if feedback is None:
+                continue
+            if hex((feedback['test_value'][0])) != '0x123456789abcdef':
+                continue
+            self.feedback['robot_mode'] = feedback['robot_mode'][0]
+            self.feedback['currentcommandid'] = feedback['currentcommandid'][0]
     
     def get_feed(self):
         buffer_size = 100
@@ -74,32 +86,40 @@ class SystemId:
         if filter_in:
             self.command_path_mapping[command_id] = path_id
     
+    def run_point(self, response):
+        command_id = self.parse_result_id(response)[1]
+        while True:
+            if self.feedback['robot_mode'] == 5 and self.feedback['currentcommandid'] == command_id:
+                break
+            sleep(0.1)
+        
+        return response
+    
     def press(self, path_id):
-        self.save_command_id(self.d.MovL(100, 0, 100, 0, 0, 0, coordinateMode=0), False, path_id)
-        self.save_command_id(self.d.MovL(100, 0, 5, 0, 0, 0, coordinateMode=0), False, path_id)
-        self.save_command_id(self.d.MovL(100, 0, -5, 0, 0, 0, coordinateMode=0, speed=1), True, path_id)
+        self.save_command_id(self.run_point(self.d.MovJ(-350, -50, 61, 180, 0, 0, coordinateMode=0)), False, path_id)
+        self.save_command_id(self.run_point(self.d.MovL(-350, -50, 51, 180, 0, 0, coordinateMode=0), speed=1), True, path_id)
 
     def press_slide(self):
         path_id = 0
         self.press(path_id)
-        self.save_command_id(self.d.MovL(110, 0, -5, 0, 0, 0, coordinateMode=0, speed=1), True, path_id)
+        self.save_command_id(self.run_point(self.d.MovL(-360, -50, 51, 180, 0, 0, coordinateMode=0, speed=1)), True, path_id)
 
     def press_twist_x(self):
         path_id = 1
         self.press(path_id)
-        self.save_command_id(self.d.MovL(110, 0, -5, 20, 0, 0, coordinateMode=0, speed=1), True, path_id)
+        self.save_command_id(self.d.MovL(-350, -50, 51, 200, 0, 0, coordinateMode=0, speed=1), True, path_id)
 
     def press_twist_z(self):
         path_id = 1
         self.press(path_id)
-        self.save_command_id(self.d.MovL(110, 0, -5, 0, 0, 20, coordinateMode=0, speed=1), True, path_id)
+        self.save_command_id(self.d.MovL(-350, -50, 51, 180, 0, 20, coordinateMode=0, speed=1), True, path_id)
     
     def go(self):
-        n = 10
+        n = 4
         paths = [
             self.press_slide,
-            self.press_twist_x,
-            self.press_twist_z,
+            # self.press_twist_x,
+            # self.press_twist_z,
         ]
         for path in paths:
             for i in range(n):
