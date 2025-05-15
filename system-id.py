@@ -14,11 +14,12 @@ class SystemId:
         self.f = DobotApiFeedBack(ip, feedback_port)
         self.command_path_mapping = dict()
         self.feedback = dict()
+        self.speed = 2
 
         print(self.d.RequestControl())
         print(self.d.EnableRobot())
 
-        threading.Thread(target=self.get_feed_small, daemon=True).start()
+        threading.Thread(target=self.get_feed, daemon=True).start()
     
     def parse_result_id(self, response):
         if "Not Tcp" in response:
@@ -49,11 +50,10 @@ class SystemId:
                 feedback = self.f.feedBackData()
                 if feedback is None:
                     continue
-                with open('./feedback.pkl', 'wb') as file:
-                    pickle.dump(feedback, file)
-                raise Exception()
-                if hex((feedback['test_value'][0])) != '0x123456789abcdef':
-                    continue
+                if hex((feedback['TestValue'][0])) != '0x123456789abcdef':
+                    raise Exception("TestValue not as expected")
+                self.feedback['RobotMode'] = feedback['RobotMode'][0]
+                self.feedback['CurrentCommandId'] = feedback['CurrentCommandId'][0]
                 relevant_fields = [
                     'SixForceValue',
                     'ActualTCPForce',
@@ -64,13 +64,12 @@ class SystemId:
                     'QActual',
                     'QDTarget',
                     'QDActual',
-                    'currentcommandid',
-                    'robot_mode',
+                    'CurrentCommandId',
+                    'RobotMode',
                 ]
                 feedback_filetred = dict()
                 for field in relevant_fields:
-                    if field in feedback:
-                        feedback_filetred[field] = feedback[field]
+                    feedback_filetred[field] = feedback[field][0]
                 data_buffer.append(feedback_filetred)
                 if len(data_buffer) >= buffer_size:
                     with open(file_path, 'ab') as f:
@@ -100,25 +99,25 @@ class SystemId:
     
     def press(self, path_id):
         self.save_command_id(self.run_point(self.d.MovJ(-350, -50, 61, 180, 0, 0, coordinateMode=0)), False, path_id)
-        self.save_command_id(self.run_point(self.d.MovL(-350, -50, 51, 180, 0, 0, coordinateMode=0, speed=1)), True, path_id)
+        self.save_command_id(self.run_point(self.d.MovL(-350, -50, 51, 180, 0, 0, coordinateMode=0, speed=self.speed)), True, path_id)
 
     def press_slide(self):
         path_id = 0
         self.press(path_id)
-        self.save_command_id(self.run_point(self.d.MovL(-360, -50, 51, 180, 0, 0, coordinateMode=0, speed=1)), True, path_id)
+        self.save_command_id(self.run_point(self.d.MovL(-360, -50, 51, 180, 0, 0, coordinateMode=0, speed=self.speed)), True, path_id)
 
     def press_twist_x(self):
         path_id = 1
         self.press(path_id)
-        self.save_command_id(self.d.MovL(-350, -50, 51, 200, 0, 0, coordinateMode=0, speed=1), True, path_id)
+        self.save_command_id(self.d.MovL(-350, -50, 51, 200, 0, 0, coordinateMode=0, speed=self.speed), True, path_id)
 
     def press_twist_z(self):
         path_id = 1
         self.press(path_id)
-        self.save_command_id(self.d.MovL(-350, -50, 51, 180, 0, 20, coordinateMode=0, speed=1), True, path_id)
+        self.save_command_id(self.d.MovL(-350, -50, 51, 180, 0, 20, coordinateMode=0, speed=self.speed), True, path_id)
     
     def go(self):
-        n = 4
+        n = 2
         paths = [
             self.press_slide,
             # self.press_twist_x,

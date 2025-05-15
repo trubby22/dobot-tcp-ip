@@ -31,9 +31,12 @@ let's copy-paste the code from dobot demo
 
 I want to collect as many logs and data as possible and I will analyse it / debug at home
 
-to do now:
-- make robot commands blocking
-- collect and store feedback data
-
 to do later:
 - control the robot's angular speed (maybe try from Dobot Studio)
+
+timestamp from dobot feedback doesn't work - it shows 1970 and it shows that the whole motion took place within less than 1 second even though the whole motion lasted 1 minute
+- so I need to get the timestamp from ubuntu system clock insted
+
+also, the force value readings are all 0 - maybe I need to enable force readings in settings
+
+I want to get dobot feedback and video recording simultaneously and then when I'm back home stich these 2 datasets together
