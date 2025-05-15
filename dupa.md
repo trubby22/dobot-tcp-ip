@@ -28,3 +28,12 @@ problem: the suturing phantom's bottom layer is made of foam - I cannot fix it t
 if I just leave it on the optical board w/o any fixing, the phantom slides during press-slide motion
 
 let's copy-paste the code from dobot demo
+
+I want to collect as many logs and data as possible and I will analyse it / debug at home
+
+to do now:
+- make robot commands blocking
+- collect and store feedback data
+
+to do later:
+- control the robot's angular speed (maybe try from Dobot Studio)

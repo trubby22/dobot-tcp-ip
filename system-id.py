@@ -35,10 +35,10 @@ class SystemId:
             feedback = self.f.feedBackData()
             if feedback is None:
                 continue
-            if hex((feedback['test_value'][0])) != '0x123456789abcdef':
-                continue
-            self.feedback['robot_mode'] = feedback['robot_mode'][0]
-            self.feedback['currentcommandid'] = feedback['currentcommandid'][0]
+            if hex((feedback['TestValue'][0])) != '0x123456789abcdef':
+                raise Exception("TestValue not as expected")
+            self.feedback['RobotMode'] = feedback['RobotMode'][0]
+            self.feedback['CurrentCommandId'] = feedback['CurrentCommandId'][0]
     
     def get_feed(self):
         buffer_size = 100
@@ -89,15 +89,18 @@ class SystemId:
     def run_point(self, response):
         command_id = self.parse_result_id(response)[1]
         while True:
-            if self.feedback['robot_mode'] == 5 and self.feedback['currentcommandid'] == command_id:
+            if self.feedback['RobotMode'] == 5 and self.feedback['CurrentCommandId'] == command_id:
                 break
             sleep(0.1)
         
         return response
+
+    def home_pos(self):
+        self.save_command_id(self.run_point(self.d.MovJ(-350, -50, 61, 180, 0, 0, coordinateMode=0)), False, -1)
     
     def press(self, path_id):
         self.save_command_id(self.run_point(self.d.MovJ(-350, -50, 61, 180, 0, 0, coordinateMode=0)), False, path_id)
-        self.save_command_id(self.run_point(self.d.MovL(-350, -50, 51, 180, 0, 0, coordinateMode=0), speed=1), True, path_id)
+        self.save_command_id(self.run_point(self.d.MovL(-350, -50, 51, 180, 0, 0, coordinateMode=0, speed=1)), True, path_id)
 
     def press_slide(self):
         path_id = 0
@@ -124,6 +127,7 @@ class SystemId:
         for path in paths:
             for i in range(n):
                 path()
+        self.home_pos()
 
     def save_to_file(self):
         with open('./command_path_mapping.pkl', 'wb') as file:

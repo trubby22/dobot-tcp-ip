@@ -83,3 +83,6 @@ class DobotDemo:
     def __del__(self):
         del self.dashboard
         del self.feedFour
+
+foo = DobotDemo(ip='192.168.5.1')
+foo.start()
