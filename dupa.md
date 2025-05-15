@@ -56,3 +56,8 @@ GUI tells me "FT sensor not connected" - so I won't be getting force-torque read
 - I will talk to Dandan later about whether it makes sense to use the force-torque sensor or not
 
 one last try - no, let's not waste time - I know that FT sensing doesn't work already
+
+problem: regardless of the room lighting conditions (bright - light from outside or lamps inside turned on; dark - dark outside, lamps indide turned off), the tactile video data has too much light and the markers aren't visible
+
+I need separate gucview settings for different lighting conditions (mainly modify the gamma value)
+
