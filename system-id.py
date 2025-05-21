@@ -17,6 +17,7 @@ class SystemId:
         self.command_path_mapping = dict()
         self.feedback = dict()
         self.speed = 1
+        self.v = 2
 
         print(self.d.RequestControl())
         print(self.d.EnableRobot())
@@ -130,24 +131,22 @@ class SystemId:
     def press_twist_x(self):
         path_id = 1
         self.press(path_id)
-        v = 2
-        self.save_command_id(self.run_point(self.d.MovL(-310, -25, 53, 200, 0, 0, coordinateMode=0, v=v), current_speed=v, name="twist-x"), True, path_id)
+        self.save_command_id(self.run_point(self.d.MovL(-310, -25, 53, 200, 0, 0, coordinateMode=0, v=self.v), current_speed=self.v, name="twist-x"), True, path_id)
 
     def press_twist_z(self):
         path_id = 1
         self.press(path_id)
-        v = 2
-        self.save_command_id(self.run_point(self.d.MovL(-310, -25, 53, 180, 0, 20, coordinateMode=0, v=v), current_speed=v, name="twist-z"), True, path_id)
+        self.save_command_id(self.run_point(self.d.MovL(-310, -25, 53, 180, 0, 20, coordinateMode=0, v=self.v), current_speed=self.v, name="twist-z"), True, path_id)
     
     def go(self):
-        n = 1
+        n = 3
         paths = [
             self.press_slide,
             self.press_twist_x,
             self.press_twist_z,
         ]
-        for path in paths:
-            for i in range(n):
+        for i in range(n):
+            for path in paths:
                 path()
         self.home_pos()
 
