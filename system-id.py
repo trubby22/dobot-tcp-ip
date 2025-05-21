@@ -5,6 +5,7 @@ import pickle
 import IPython
 from time import sleep
 from datetime import datetime
+import time
 
 class SystemId:
     def __init__(self):
@@ -15,7 +16,7 @@ class SystemId:
         self.f = DobotApiFeedBack(ip, feedback_port)
         self.command_path_mapping = dict()
         self.feedback = dict()
-        self.speed = 2
+        self.speed = 1
 
         print(self.d.RequestControl())
         print(self.d.EnableRobot())
@@ -87,43 +88,63 @@ class SystemId:
         if filter_in:
             self.command_path_mapping[command_id] = path_id
     
-    def run_point(self, response):
+    def run_point(self, response, current_speed=1, name="n/a"):
+        start_time = time.perf_counter()
+
         command_id = self.parse_result_id(response)[1]
         while True:
             if self.feedback['RobotMode'] == 5 and self.feedback['CurrentCommandId'] == command_id:
                 break
             sleep(0.1)
         
+        end_time = time.perf_counter()
+        elapsed_time = end_time - start_time
+        target_time = 10
+        if name != "n/a":
+            print(f"Run to: {name}")
+            print(f"Elapsed time: {elapsed_time:.1f} s; target time: {target_time:.1f} s")
+            # speed = distance / time
+            # target_speed = foo / target_time = foo / elapsed_time * ratio = current_speed * ratio
+            # target_time * ratio = elapsed_time
+            # ratio = elapsed_time / target_time
+
+            speed_ratio = elapsed_time / target_time
+            target_speed = current_speed * speed_ratio
+            print(f"Current speed: {current_speed:.1f}; target speed: {target_speed:.1f}")
+            print()
+
         return response
 
     def home_pos(self):
-        self.save_command_id(self.run_point(self.d.MovJ(-350, -50, 61, 180, 0, 0, coordinateMode=0)), False, -1)
+        self.save_command_id(self.run_point(self.d.MovJ(-310, -25, 63, 180, 0, 0, coordinateMode=0, v=self.speed)), False, -1)
     
     def press(self, path_id):
-        self.save_command_id(self.run_point(self.d.MovJ(-350, -50, 61, 180, 0, 0, coordinateMode=0)), False, path_id)
-        self.save_command_id(self.run_point(self.d.MovL(-350, -50, 51, 180, 0, 0, coordinateMode=0, speed=self.speed)), True, path_id)
+        self.save_command_id(self.run_point(self.d.MovJ(-310, -25, 63, 180, 0, 0, coordinateMode=0, v=self.speed)), False, path_id)
+        self.save_command_id(self.run_point(self.d.MovL(-310, -25, 53, 180, 0, 0, coordinateMode=0, speed=self.speed), current_speed=self.speed, name="press"), True, path_id)
 
     def press_slide(self):
         path_id = 0
         self.press(path_id)
-        self.save_command_id(self.run_point(self.d.MovL(-360, -50, 51, 180, 0, 0, coordinateMode=0, speed=self.speed)), True, path_id)
+        self.save_command_id(self.run_point(self.d.MovL(-320, -25, 53, 180, 0, 0, coordinateMode=0, speed=self.speed), current_speed=self.speed, name="slide"), True, path_id)
 
     def press_twist_x(self):
         path_id = 1
         self.press(path_id)
-        self.save_command_id(self.d.MovL(-350, -50, 51, 200, 0, 0, coordinateMode=0, speed=self.speed), True, path_id)
+        v = 2
+        self.save_command_id(self.run_point(self.d.MovL(-310, -25, 53, 200, 0, 0, coordinateMode=0, v=v), current_speed=v, name="twist-x"), True, path_id)
 
     def press_twist_z(self):
         path_id = 1
         self.press(path_id)
-        self.save_command_id(self.d.MovL(-350, -50, 51, 180, 0, 20, coordinateMode=0, speed=self.speed), True, path_id)
+        v = 2
+        self.save_command_id(self.run_point(self.d.MovL(-310, -25, 53, 180, 0, 20, coordinateMode=0, v=v), current_speed=v, name="twist-z"), True, path_id)
     
     def go(self):
-        n = 3
+        n = 1
         paths = [
             self.press_slide,
-            # self.press_twist_x,
-            # self.press_twist_z,
+            self.press_twist_x,
+            self.press_twist_z,
         ]
         for path in paths:
             for i in range(n):

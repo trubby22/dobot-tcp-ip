@@ -1833,6 +1833,7 @@ class DobotApiDashboard(DobotApi):
         a int 执⾏该条指令时的机械臂运动加速度⽐例。取值范围：(0,100]
         v int 执⾏该条指令时的机械臂运动速度⽐例。取值范围：(0,100]
         cp int 平滑过渡⽐例。取值范围：[0,100]
+        
         Description
         Move from the current position to the target position through joint motion.
         Required parameter:
