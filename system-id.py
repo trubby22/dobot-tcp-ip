@@ -2,7 +2,6 @@ from dobot_api import DobotApiFeedBack,DobotApiDashboard
 import threading
 import re
 import pickle
-import IPython
 from time import sleep
 from datetime import datetime
 import time
