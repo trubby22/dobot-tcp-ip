@@ -138,16 +138,20 @@ class SystemId:
         self.save_command_id(self.run_point(self.d.MovL(-310, -25, 53, 180, 0, 20, coordinateMode=0, v=self.v), current_speed=self.v, name="twist-z"), True, path_id)
     
     def go(self):
-        n = 3
-        paths = [
-            self.press_slide,
-            self.press_twist_x,
-            self.press_twist_z,
+        target_points_xy = [
+            [-400, 150],
+            [-400+150, 150],
+            [-400+150, 150-14],
+            [-400, 150-14],
+            [-400, 150-28],
+            [-400+150, 150-28],
+            [-400+150, 150-42],
+            [-400, 150-42],
+            [-400, 150-56],
+            [-400+150, 150-56],
         ]
-        for i in range(n):
-            for path in paths:
-                path()
-        self.home_pos()
+        for x, y in target_points_xy:
+            self.run_point(self.d.MovL(x, y, 77, 180, 0, 0, coordinateMode=0, v=2))
 
     def save_to_file(self):
         with open('./command_path_mapping.pkl', 'wb') as file:
@@ -156,4 +160,3 @@ class SystemId:
 if __name__ == '__main__':
     system_id = SystemId()
     system_id.go()
-    system_id.save_to_file()
