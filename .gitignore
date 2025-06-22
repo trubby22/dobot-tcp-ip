@@ -3,3 +3,5 @@ __pycache__
 *.pdf
 dobot-manuals/
 *.pkl
+experiment-capture*/
+
