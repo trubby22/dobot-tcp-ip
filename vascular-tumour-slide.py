@@ -150,8 +150,10 @@ class SystemId:
             [-400, 150-56],
             [-400+150, 150-56],
         ]
+        self.run_point(self.d.MovL(target_points_xy[0][0], target_points_xy[0][1], 83, 180, 0, 0, coordinateMode=0, v=2))
         for x, y in target_points_xy:
             self.run_point(self.d.MovL(x, y, 77, 180, 0, 0, coordinateMode=0, v=2))
+        self.run_point(self.d.MovL(target_points_xy[-1][0], target_points_xy[-1][1], 83, 180, 0, 0, coordinateMode=0, v=2))
 
     def save_to_file(self):
         with open('./command_path_mapping.pkl', 'wb') as file:
