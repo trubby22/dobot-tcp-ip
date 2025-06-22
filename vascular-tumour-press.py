@@ -2,6 +2,10 @@ from dobot_api import DobotApiFeedBack,DobotApiDashboard
 import threading
 import re
 from time import sleep
+import numpy as np
+import cv2
+
+SENSOR_DOME_TIP_INITIAL_POSE = np.array([0, 0, 0, 180, 0, 0], dtype=float)
 
 class Controller:
     def __init__(self):
@@ -12,6 +16,7 @@ class Controller:
         self.f = DobotApiFeedBack(ip, feedback_port)
         self.robot_mode = None
         self.current_command_id = None
+        self.init_camera()
 
         print(self.d.RequestControl())
         print(self.d.EnableRobot())
@@ -27,6 +32,7 @@ class Controller:
     def __del__(self):
         del self.d
         del self.f
+        self.release_camera()
     
     def get_feed_small(self):
         while True:
@@ -46,22 +52,66 @@ class Controller:
             sleep(0.1)
         return response
     
-    def go(self):
-        trajectory_xy = [
-            [-400, 150],
-            [-400+150, 150],
-            [-400+150, 150-14],
-            [-400, 150-14],
-            [-400, 150-28],
-            [-400+150, 150-28],
-            [-400+150, 150-42],
-            [-400, 150-42],
-            [-400, 150-56],
-            [-400+150, 150-56],
+    def press_and_take_photo(self, press_ix):
+        xr_offset = np.random.uniform(-15, 15)
+        yr_offset = np.random.uniform(-15, 15)
+        zr_offset = np.random.uniform(-15, 15)
+        press_depth = np.random.uniform(6, 16)
+        x, y, z, xr, yr, zr = SENSOR_DOME_TIP_INITIAL_POSE.copy()
+        trajectory = np.array([
+            [x, y, z, xr+xr_offset, yr+yr_offset, zr+zr_offset],
+            [x, y, z-press_depth, xr+xr_offset, yr+yr_offset, zr+zr_offset],
+            [x, y, z, xr+xr_offset, yr+yr_offset, zr+zr_offset],
+        ], dtype=float)
+        for i in range(trajectory.shape[0]):
+            x, y, z, xr, yr, zr = trajectory[i]
+            self.run_point(self.d.MovL(x, y, z, xr, yr, zr, coordinateMode=0, v=2))
+            if i == 1:
+                self.capture_and_save_photo(press_ix)
+    
+    def init_camera(self):
+        self.cap = cv2.VideoCapture(0)
+
+        if not self.cap.isOpened():
+            print("Error: Could not open camera.")
+            exit()
+        
+        guvcview_settings = [
+            (0x00980900, -64),
+            (0x00980901, 48),
+            (0x00980902, 0),
+            (0x00980903, 0),
+            (0x0098090c, 1),
+            (0x00980910, 100),
+            (0x00980913, 0),
+            (0x00980918, 1),
+            (0x0098091a, 5000),
+            (0x0098091b, 3),
+            (0x0098091c, 0),
+            (0x009a0901, 1),
+            (0x009a0902, 100),
+            (0x009a0903, 0),
         ]
-        for x, y in trajectory_xy:
-            self.run_point(self.d.MovL(x, y, 77, 180, 0, 0, coordinateMode=0, v=2))
+
+        for id, val in guvcview_settings:
+            self.cap.set(id, val)
+
+    def capture_and_save_photo(self, i):
+        ret, frame = self.cap.read()
+        if ret:
+            cv2.imwrite(f"/home/psb120/Documents/TCP-IP-Python-V4/experiment-capture/press-{i}.jpg", frame)
+            print(f"Photo for press {i} taken successfully!")
+        else:
+            print(f"Error: Could not capture frame for press {i}.")
+
+    def release_camera(self):
+        self.cap.release()
+        cv2.destroyAllWindows()
 
 if __name__ == '__main__':
     controller = Controller()
-    controller.go()
+    i = 0
+    while True:
+        controller.capture_and_save_photo(i)
+        print(f'press {i} complete!')
+        i += 1
