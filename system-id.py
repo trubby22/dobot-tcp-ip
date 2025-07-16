@@ -15,7 +15,7 @@ class SystemId:
         self.feedback = dict()
 
         self.set_trajectories()
-        self.home_pos_np = np.array([-260, -25, 82, 180, 0, 0])
+        self.home_pos_np = np.array([-260, -25, 38, 180, 0, 0])
 
         print(self.d.RequestControl())
         print(self.d.EnableRobot())
@@ -76,9 +76,9 @@ class SystemId:
             ],
             [
                 [x, y, z, xr, yr, zr],
-                [x, y, z, xr, yr, zr],
                 [x, y, z-press_depth_1, xr, yr, zr],
                 [x-slide_length, y, z-press_depth_1, xr, yr, zr],
+                [x-slide_length, y, z, xr, yr, zr],
             ],
             [
                 [x, y, z, xr, yr, zr],
