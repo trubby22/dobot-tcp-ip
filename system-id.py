@@ -13,15 +13,15 @@ class SystemId:
         self.d = DobotApiDashboard(ip, dashboard_port)
         self.f = DobotApiFeedBack(ip, feedback_port)
         self.feedback = dict()
-        self.print_force = False
 
-        self.home_pos_np = np.array([-260, -25, 82, 180, 0, 0])
         self.set_trajectories()
+        self.home_pos_np = np.array([-260, -25, 82, 180, 0, 0])
 
         print(self.d.RequestControl())
         print(self.d.EnableRobot())
         print(self.d.SetCollisionLevel(0))
         print(self.d.SetBackDistance(0))
+        print(self.d.Tool(2))
 
         threading.Thread(target=self.get_feed_small, daemon=True).start()
     
@@ -34,6 +34,13 @@ class SystemId:
     def parse_pose(self, pose_str):
         pose_part = pose_str.split('{')[1].split('}')[0]
         return [float(x) for x in pose_part.split(',')]
+    
+    def parse_command_id(self, pose_str):
+        pose_part = pose_str.split('{')[1].split('}')[0]
+        if len(pose_part) > 0:
+            return int(pose_part)
+        else:
+            return -1
 
     def __del__(self):
         del self.d
@@ -48,38 +55,16 @@ class SystemId:
                 raise Exception("TestValue not as expected")
             self.feedback['RobotMode'] = feedback['RobotMode'][0]
             self.feedback['CurrentCommandId'] = feedback['CurrentCommandId'][0]
-            if self.print_force:
-                print(feedback['TCPForce'])
-                
     
     def run_point(self, response):
-        command_id = self.parse_result_id(response)[1]
+        command_id = self.parse_command_id(response)
         while True:
-            if self.feedback['RobotMode'] == 5 and self.feedback['CurrentCommandId'] == command_id:
+            if command_id == -1 or (self.feedback['RobotMode'] == 5 and self.feedback['CurrentCommandId'] == command_id):
                 break
             sleep(0.1)
     
-    def run_point_servo(self, dx, v):
-        if abs(dx) < 1e-6:
-            print(f'dx cannot be 0')
-        pose = self.parse_pose(self.d.GetPose())
-        init_x = pose[0]
-        target_x = init_x + dx
-        while True:
-            direction = np.sign(target_x - pose[0])
-            pose[0] += direction * v * 10 * 0.030
-            # pose[2] += (v / 5) * 10 * 0.030
-            self.d.ServoP(*pose)
-            sleep(0.030)
-            pose = self.parse_pose(self.d.GetPose())
-            if dx > 0:
-                succ = pose[0] >= target_x
-            else:
-                succ = pose[0] <= target_x
-            if succ:
-                break
-    
     def set_trajectories(self):
+        self.home_pos_np = np.array(self.parse_pose(self.d.GetPose()))
         x, y, z, xr, yr, zr = self.home_pos_np
         press_depth = 4
         slide_length = 50
@@ -94,7 +79,7 @@ class SystemId:
             [
                 [x, y, z, xr, yr, zr],
                 [x, y, z-press_depth, xr, yr, zr],
-                [x-slide_length, y, z-press_depth+2, xr, yr, zr],
+                [x-slide_length, y, z-press_depth, xr, yr, zr],
             ],
             [
                 [x, y, z, xr, yr, zr],
@@ -108,14 +93,44 @@ class SystemId:
             ],
         ])
     
-    def execute_trajectory(self, trajectory_ix, v):
+    def run_point_servo(self, target_pose, v_pos, v_ori, Kp, threshold_pos, threshold_ori):
+        target_pose = np.array(target_pose)
+        t = 0
+        while True:
+            pose = np.array(self.parse_pose(self.d.GetPose()))
+            error_pos = target_pose[:3] - pose[:3]
+            error_ori = ((target_pose[3:] - pose[3:] + 180) % 360) - 180
+            error = np.concatenate([error_pos, error_ori])
+            if np.all(np.abs(error_pos) < threshold_pos) and np.all(np.abs(error_ori) < threshold_ori):
+                break
+            vel = Kp * error
+            vel[:3] = np.clip(vel[:3], -v_pos, v_pos)
+            vel[3:] = np.clip(vel[3:], -v_ori, v_ori)
+            next_pose = pose + vel * 0.030
+            if False and t % 1 == 0:
+                print(f'pose: {pose}')
+                print(f'target_pose: {target_pose}')
+                print(f'error: {error}')
+                print(f'vel: {vel}')
+                print(f'next_pose: {next_pose}')
+                print()
+            self.d.ServoP(*next_pose.tolist())
+            sleep(0.030)
+            t += 1
+    
+    def execute_trajectory(self, trajectory_ix):
         for i in range(self.trajectories_np[trajectory_ix].shape[0]):
-            self.run_point(
-                self.d.MovL(*self.trajectories_np[trajectory_ix][i].tolist(), coordinateMode=0, speed=v)
+            self.run_point_servo(
+                target_pose=self.trajectories_np[trajectory_ix][i],
+                v_pos=10,
+                v_ori=20,
+                Kp=10.0,
+                threshold_pos=0.1,
+                threshold_ori=1.0,
             )
             print(f'target {i} reached!')
         sleep(0.5)
-        self.run_home_pos()
+        self.run_home_pos(10)
 
     def run_home_pos(self, v):
         self.run_point(self.d.MovJ(*self.home_pos_np.tolist(), coordinateMode=0, v=v))
@@ -130,8 +145,4 @@ class SystemId:
 if __name__ == '__main__':
     s = SystemId()
     IPython.embed()
-    # try:
-    #     while True:
-    #         sleep(1)  # Sleep to prevent high CPU usage
-    # except KeyboardInterrupt:
-    #     print("\nShutting down gracefully...")
+
