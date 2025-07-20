@@ -22,6 +22,7 @@ class SystemId:
         print(self.d.SetCollisionLevel(0))
         print(self.d.SetBackDistance(0))
         print(self.d.Tool(2))
+        print(self.d.SetPayload(load=0.2))
 
         threading.Thread(target=self.get_feed_small, daemon=True).start()
 
@@ -64,6 +65,7 @@ class SystemId:
         press_depth_1 = 4
         press_depth_2 = 6
         press_depth_3 = 8
+        press_depth_4 = 10
         slide_length = 50
         twist_x = 30
         twist_z = 45
@@ -91,6 +93,12 @@ class SystemId:
                 [x, y, z-press_depth_3, xr, yr, zr],
                 [x, y, z-press_depth_3, xr, yr, zr+twist_z],
                 [x, y, z, xr, yr, zr+twist_z],
+            ],
+            [
+                [x, y, z, xr, yr, zr],
+                [x, y, z, xr, yr, zr],
+                [x, y, z, xr, yr, zr],
+                [x, y, z-press_depth_4, xr, yr, zr],
             ],
         ])
     
