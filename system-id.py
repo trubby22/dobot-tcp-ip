@@ -22,7 +22,6 @@ class SystemId:
         print(self.d.SetCollisionLevel(0))
         print(self.d.SetBackDistance(0))
         print(self.d.Tool(2))
-        print(self.d.SetPayload(load=0.2))
 
         threading.Thread(target=self.get_feed_small, daemon=True).start()
 
