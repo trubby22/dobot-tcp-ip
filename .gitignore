@@ -2,3 +2,12 @@ __pycache__
 .DS_Store
 *.pdf
 dobot-manuals/
+*.zip
+*.jpg
+*.png
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.ico
+*.webp
