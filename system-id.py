@@ -5,6 +5,11 @@ from time import sleep
 import numpy as np
 import IPython
 
+import cv2
+import time
+import threading
+
+
 class SystemId:
     def __init__(self):
         ip = '192.168.5.1'
@@ -14,8 +19,9 @@ class SystemId:
         self.f = DobotApiFeedBack(ip, feedback_port)
         self.feedback = dict()
 
-        self.set_trajectories()
         self.home_pos_np = np.array([-260, -25, 38, 180, 0, 0])
+        self.set_trajectories()
+        self.trajectories_initialised = False
 
         print(self.d.RequestControl())
         print(self.d.EnableRobot())
@@ -24,6 +30,75 @@ class SystemId:
         print(self.d.Tool(2))
 
         threading.Thread(target=self.get_feed_small, daemon=True).start()
+
+        self.set_up_video_capture()
+
+    def set_up_video_capture(self):
+        self.cap = cv2.VideoCapture(0)
+        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc("M", "J", "P", "G"))
+        self.cap.set(cv2.CAP_PROP_FPS, 30)
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        self.cap.set(cv2.CAP_PROP_BRIGHTNESS, -64)
+        self.cap.set(cv2.CAP_PROP_CONTRAST, 48)
+        self.cap.set(cv2.CAP_PROP_SATURATION, 0)
+        self.cap.set(cv2.CAP_PROP_HUE, 0)
+        self.cap.set(cv2.CAP_PROP_SHARPNESS, 3)
+        self.cap.set(cv2.CAP_PROP_AUTO_WB, 0)
+        self.cap.set(cv2.CAP_PROP_WB_TEMPERATURE, 5000)
+        self.cap.set(cv2.CAP_PROP_GAMMA, 100)
+        self.cap.set(cv2.CAP_PROP_GAIN, 0)
+        self.cap.set(cv2.CAP_PROP_BACKLIGHT, 0)
+        self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
+        self.cap.set(cv2.CAP_PROP_EXPOSURE, 100)
+        print(f"Actual camera settings:")
+        print(
+            f"Resolution: {self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)}x{self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)}"
+        )
+        print(f"FPS: {self.cap.get(cv2.CAP_PROP_FPS)}")
+        print(f"Exposure: {self.cap.get(cv2.CAP_PROP_EXPOSURE)}")
+        print(f"White Balance: {self.cap.get(cv2.CAP_PROP_WB_TEMPERATURE)}")
+        self.frame_lock = threading.Lock()
+        self.current_frame_number = 0
+        self.video_thread = None
+        self.recording = False
+
+    def start_video_recording(self):
+        if self.video_thread and self.video_thread.is_alive():
+            self.end_video_recording()
+            
+        if not self.cap.isOpened():
+            self.set_up_video_capture()
+            
+        fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        output_path = f"robot_video_{timestamp}.avi"
+        width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = self.cap.get(cv2.CAP_PROP_FPS)
+        self.out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        
+        self.current_frame_number = 0
+        self.recording = True
+        self.video_thread = threading.Thread(target=self.capture_video, daemon=True)
+        self.video_thread.start()
+    
+    def end_video_recording(self):
+        self.recording = False
+        if self.video_thread:
+            self.video_thread.join()
+        if hasattr(self, 'out') and self.out:
+            self.out.release()
+        cv2.destroyAllWindows()
+
+    def capture_video(self):
+        while self.recording and self.cap.isOpened():
+            ret, frame = self.cap.read()
+            if not ret:
+                break
+            with self.frame_lock:
+                self.current_frame_number += 1
+            self.out.write(frame)
 
     def parse_pose(self, pose_str):
         pose_part = pose_str.split('{')[1].split('}')[0]
@@ -60,48 +135,70 @@ class SystemId:
     def set_trajectories(self):
         self.home_pos_np = np.array(self.parse_pose(self.d.GetPose()))
         x, y, z, xr, yr, zr = self.home_pos_np
-        press_depth_0 = 10
-        press_depth_1 = 4
-        press_depth_2 = 6
-        press_depth_3 = 8
-        press_depth_4 = 10
-        slide_length = 50
-        twist_x = 30
-        twist_z = 45
-        self.trajectories_np = np.array([
-            [
-                [x, y, z, xr, yr, zr],
-                [x, y, z, xr, yr, zr],
-                [x, y, z-press_depth_0, xr, yr, zr],
-                [x, y, z, xr, yr, zr],
-            ],
-            [
-                [x, y, z, xr, yr, zr],
-                [x, y, z-press_depth_1, xr, yr, zr],
-                [x-slide_length, y, z-press_depth_1, xr, yr, zr],
-                [x-slide_length, y, z, xr, yr, zr],
-            ],
-            [
-                [x, y, z, xr, yr, zr],
-                [x, y, z, xr, yr, zr],
-                [x, y, z-press_depth_2, xr, yr, zr],
-                [x, y, z-press_depth_2, xr+twist_x, yr, zr],
-            ],
-            [
-                [x, y, z, xr, yr, zr],
-                [x, y, z-press_depth_3, xr, yr, zr],
-                [x, y, z-press_depth_3, xr, yr, zr+twist_z],
-                [x, y, z, xr, yr, zr+twist_z],
-            ],
-            [
-                [x, y, z, xr, yr, zr],
-                [x, y, z, xr, yr, zr],
-                [x, y, z, xr, yr, zr],
-                [x, y, z-press_depth_4, xr, yr, zr],
-            ],
-        ])
+        press_depth = 4
+        r = 20
+        dx = 105 - 2*r
+        dy = 180 - 2*r
+        d_single = r
+        min_y = y - dy
+        traj_1 = [
+            [x, y, z, xr, yr, zr],
+            [x, y, z-press_depth, xr, yr, zr],
+        ]
+        xy_dirs = [
+            [1, 0],
+            [0, -1],
+            [-1, 0],
+            [0, -1],
+        ]
+        xy_i = 0
+        while True:
+            a, b, c, d, e, f = traj_1[-1]
+            if b < min_y - d_single:
+                break
+            x_dir, y_dir = xy_dirs[xy_i]
+            xy_i += 1
+            xy_i %= 4
+            a2 = a + x_dir * dx
+            b2 = b + y_dir * d_single
+            traj_1.append(
+                [a2, b2, c, d, e, f]
+            )
+        traj_1 = np.array(traj_1, dtype=float)
+
+        max_x = x + dx
+        traj_2 = [
+            [x, y, z, xr, yr, zr],
+            [x, y, z-press_depth, xr, yr, zr],
+        ]
+        xy_dirs = [
+            [0, -1],
+            [1, 0],
+            [0, 1],
+            [1, 0],
+        ]
+        xy_i = 0
+        while True:
+            a, b, c, d, e, f = traj_2[-1]
+            if a > max_x + d_single:
+                break
+            x_dir, y_dir = xy_dirs[xy_i]
+            xy_i += 1
+            xy_i %= 4
+            a2 = a + x_dir * d_single
+            b2 = b + y_dir * dy
+            traj_2.append(
+                [a2, b2, c, d, e, f]
+            )
+        traj_2 = np.array(traj_2, dtype=float)
+
+        self.trajectories_np = [
+            traj_1,
+            traj_2
+        ]
+        self.trajectories_initialised = True
     
-    def run_point_servo(self, target_pose, v_pos, v_ori, Kp, threshold_pos, threshold_ori):
+    def run_point_servo(self, target_pose, v_pos, v_ori, Kp, threshold_pos, threshold_ori, downward_motion=False):
         target_pose = np.array(target_pose)
         t = 0
         while True:
@@ -112,6 +209,8 @@ class SystemId:
             if np.all(np.abs(error_pos) < threshold_pos) and np.all(np.abs(error_ori) < threshold_ori):
                 break
             vel = Kp * error
+            if downward_motion:
+                vel[2] -= 100
             vel[:3] = np.clip(vel[:3], -v_pos, v_pos)
             vel[3:] = np.clip(vel[3:], -v_ori, v_ori)
             next_pose = pose + vel * 0.030
@@ -119,18 +218,26 @@ class SystemId:
             sleep(0.030)
             t += 1
     
-    def execute_trajectory(self, trajectory_ix):
-        for i in range(self.trajectories_np[trajectory_ix].shape[0]):
-            self.run_point_servo(
-                target_pose=self.trajectories_np[trajectory_ix][i],
-                v_pos=10,
-                v_ori=20,
-                Kp=10.0,
-                threshold_pos=0.1,
-                threshold_ori=1.0,
-            )
-            print(f'target {i} reached!')
-        sleep(0.5)
+    def execute_trajectory(self, trajectory_ix, downward_motion=False, Kp=20.0, v_pos=100, v_ori=90):
+        if self.trajectories_initialised:
+            self.start_video_recording()
+            sleep(2)
+            for i in range(len(self.trajectories_np[trajectory_ix])):
+                self.run_point_servo(
+                    target_pose=self.trajectories_np[trajectory_ix][i],
+                    v_pos=v_pos,
+                    v_ori=v_ori,
+                    Kp=Kp,
+                    threshold_pos=0.1,
+                    threshold_ori=1.0,
+                    downward_motion=downward_motion
+                )
+                with self.frame_lock:
+                    print(f'target {i} (pose: {self.trajectories_np[trajectory_ix][i]}) reached at frame: {self.current_frame_number}!')
+            sleep(2)
+            self.end_video_recording()
+        else:
+            print("you need to set_trajectories")
 
     def run_home_pos(self):
         self.run_point(self.d.MovJ(*self.home_pos_np.tolist(), coordinateMode=0, v=20))
