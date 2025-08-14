@@ -135,7 +135,7 @@ class SystemId:
     def set_trajectories(self):
         self.home_pos_np = np.array(self.parse_pose(self.d.GetPose()))
         x, y, z, xr, yr, zr = self.home_pos_np
-        press_depth = 4
+        press_depth = 8
         r = 20
         dx = 105 - 2*r
         dy = 180 - 2*r
@@ -192,9 +192,17 @@ class SystemId:
             )
         traj_2 = np.array(traj_2, dtype=float)
 
+        traj_3 = [
+            [x, y, z, xr, yr, zr],
+            [x, y, z-press_depth, xr, yr, zr],
+            [x, y, z, xr, yr, zr],
+        ]
+        traj_3 = np.array(traj_3, dtype=float)
+
         self.trajectories_np = [
             traj_1,
-            traj_2
+            traj_2,
+            traj_3
         ]
         self.trajectories_initialised = True
     
