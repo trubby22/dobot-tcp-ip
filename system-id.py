@@ -4,6 +4,7 @@ import re
 from time import sleep
 import numpy as np
 import IPython
+import random
 
 import cv2
 import time
@@ -19,7 +20,7 @@ class SystemId:
         self.f = DobotApiFeedBack(ip, feedback_port)
         self.feedback = dict()
 
-        self.home_pos_np = np.array([-260, -25, 38, 180, 0, 0])
+        self.home_pos_np = np.array([-260, -25, 38, 180, 0, 0], dtype=float)
         self.set_trajectories()
         self.trajectories_initialised = False
 
@@ -206,6 +207,23 @@ class SystemId:
         ]
         self.trajectories_initialised = True
     
+    def randomise_traj_2(self):
+        x, y, z, xr, yr, zr = self.home_pos_np
+        press_depth = 8
+        xro = random.uniform(-10, 10)
+        yro = random.uniform(-10, 10)
+        zro = random.uniform(-10, 10)
+        xr += xro
+        yr += yro
+        zr += zro
+        traj_3 = [
+            [x, y, z, xr, yr, zr],
+            [x, y, z-press_depth, xr, yr, zr],
+            [x, y, z, xr, yr, zr],
+        ]
+        traj_3 = np.array(traj_3, dtype=float)
+        self.trajectories_np[2] = traj_3
+
     def run_point_servo(self, target_pose, v_pos, v_ori, Kp, threshold_pos, threshold_ori, downward_motion=False):
         target_pose = np.array(target_pose)
         t = 0
@@ -226,10 +244,14 @@ class SystemId:
             sleep(0.030)
             t += 1
     
-    def execute_trajectory(self, trajectory_ix, downward_motion=False, Kp=20.0, v_pos=100, v_ori=90):
+    def execute_trajectory(self, trajectory_ix, downward_motion=False, Kp=20.0, v_pos=50, v_ori=90):
+        if False and trajectory_ix == 2:
+            self.randomise_traj_2()
+            v_pos = random.uniform(25, 50)
+            v_ori = random.uniform(45, 90)
         if self.trajectories_initialised:
             self.start_video_recording()
-            sleep(2)
+            sleep(1)
             for i in range(len(self.trajectories_np[trajectory_ix])):
                 self.run_point_servo(
                     target_pose=self.trajectories_np[trajectory_ix][i],
@@ -242,7 +264,7 @@ class SystemId:
                 )
                 with self.frame_lock:
                     print(f'target {i} (pose: {self.trajectories_np[trajectory_ix][i]}) reached at frame: {self.current_frame_number}!')
-            sleep(2)
+            sleep(1)
             self.end_video_recording()
         else:
             print("you need to set_trajectories")
