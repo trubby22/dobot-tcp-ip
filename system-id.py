@@ -22,12 +22,15 @@ class SystemId:
         self.home_pos_np = np.array([-260, -25, 38, 180, 0, 0])
         self.set_trajectories()
         self.trajectories_initialised = False
+        self.output = []
 
         print(self.d.RequestControl())
         print(self.d.EnableRobot())
         print(self.d.SetCollisionLevel(0))
         print(self.d.SetBackDistance(0))
+        print(self.d.User(0))
         print(self.d.Tool(2))
+        print(self.d.SetPayload(0.200, 0, 0, 0))
 
         threading.Thread(target=self.get_feed_small, daemon=True).start()
 
@@ -124,6 +127,8 @@ class SystemId:
                 raise Exception("TestValue not as expected")
             self.feedback['RobotMode'] = feedback['RobotMode'][0]
             self.feedback['CurrentCommandId'] = feedback['CurrentCommandId'][0]
+            # self.feedback['User'] = feedback['User']
+            # self.feedback['Tool'] = feedback['Tool']
     
     def run_point(self, response):
         command_id = self.parse_command_id(response)
@@ -203,6 +208,12 @@ class SystemId:
         t = 0
         while True:
             pose = np.array(self.parse_pose(self.d.GetPose()))
+            with self.frame_lock:
+                data = [self.current_frame_number, *pose]
+                self.output.append(
+                    data
+                )
+
             error_pos = target_pose[:3] - pose[:3]
             error_ori = ((target_pose[3:] - pose[3:] + 180) % 360) - 180
             error = np.concatenate([error_pos, error_ori])
@@ -220,6 +231,7 @@ class SystemId:
     
     def execute_trajectory(self, trajectory_ix, downward_motion=False, Kp=20.0, v_pos=100, v_ori=90):
         if self.trajectories_initialised:
+            self.output = []
             self.start_video_recording()
             sleep(2)
             for i in range(len(self.trajectories_np[trajectory_ix])):
@@ -232,10 +244,14 @@ class SystemId:
                     threshold_ori=1.0,
                     downward_motion=downward_motion
                 )
-                with self.frame_lock:
-                    print(f'target {i} (pose: {self.trajectories_np[trajectory_ix][i]}) reached at frame: {self.current_frame_number}!')
             sleep(2)
             self.end_video_recording()
+            output = np.array(self.output)
+            path = 'output.npz'
+            np.savez(
+                path,
+                output=output,
+            )
         else:
             print("you need to set_trajectories")
 
