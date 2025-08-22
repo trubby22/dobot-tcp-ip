@@ -21,6 +21,7 @@ class SystemId:
 
         # self.home_pos_np = np.array([-260, -25, 38, 180, 0, 0])
         self.home_pos_np = np.array([-310.0000,20.0000,27.0000,180.0000,0.0000,0.0000], dtype=float)
+        # self.home_pos_np = np.array([35.7724,274.4154,28.0001,-180.0000,0.0000,0.0000], dtype=float)
         self.set_trajectories()
         self.trajectories_initialised = False
         self.output = []
@@ -143,10 +144,10 @@ class SystemId:
         x, y, z, xr, yr, zr = self.home_pos_np
         press_depth = 4
         r = 20
-        dx = 105 - 2*r
-        dy = 180 - 2*r
+        d_short = 105 - 2*r
+        d_long = 180 - 2*r
         d_single = r
-        min_y = y - dy
+        min_y = y - d_long
 
         # og phantom setup - see video on iPhone
         traj_1 = [
@@ -167,7 +168,7 @@ class SystemId:
             x_dir, y_dir = xy_dirs[xy_i]
             xy_i += 1
             xy_i %= 4
-            a2 = a + x_dir * dx
+            a2 = a + x_dir * d_short
             b2 = b + y_dir * d_single
             traj_1.append(
                 [a2, b2, c, d, e, f]
@@ -175,7 +176,7 @@ class SystemId:
         traj_1 = np.array(traj_1, dtype=float)
 
         # phantom setup as in traj_1 but the sensor slides along the veins rather than across them
-        max_x = x + dx
+        max_x = x + d_short
         traj_2 = [
             [x, y, z, xr, yr, zr],
             [x, y, z-press_depth, xr, yr, zr],
@@ -195,12 +196,13 @@ class SystemId:
             xy_i += 1
             xy_i %= 4
             a2 = a + x_dir * d_single
-            b2 = b + y_dir * dy
+            b2 = b + y_dir * d_long
             traj_2.append(
                 [a2, b2, c, d, e, f]
             )
         traj_2 = np.array(traj_2, dtype=float)
 
+        min_x = x - d_long
         # phantom as in traj_1 but transposed
         traj_3 = [
             [x, y, z, xr, yr, zr],
@@ -208,20 +210,20 @@ class SystemId:
         ]
         xy_dirs = [
             [0, 1],
-            [1, 0],
+            [-1, 0],
             [0, -1],
-            [1, 0]
+            [-1, 0]
         ]
         xy_i = 0
         while True:
             a, b, c, d, e, f = traj_3[-1]
-            if a > max_x + d_single:
+            if a < min_x - d_single:
                 break
             x_dir, y_dir = xy_dirs[xy_i]
             xy_i += 1
             xy_i %= 4
             a2 = a + x_dir * d_single
-            b2 = b + y_dir * dy
+            b2 = b + y_dir * d_short
             traj_3.append(
                 [a2, b2, c, d, e, f]
             )
@@ -260,7 +262,7 @@ class SystemId:
             sleep(0.030)
             t += 1
     
-    def execute_trajectory(self, trajectory_ix, downward_motion=False, Kp=20.0, v_pos=100, v_ori=90):
+    def execute_trajectory(self, trajectory_ix, downward_motion=False, Kp=20.0, v_pos=12.5, v_ori=90):
         if self.trajectories_initialised:
             self.output = []
             self.start_video_recording()
