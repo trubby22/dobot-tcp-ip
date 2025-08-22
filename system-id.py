@@ -19,7 +19,8 @@ class SystemId:
         self.f = DobotApiFeedBack(ip, feedback_port)
         self.feedback = dict()
 
-        self.home_pos_np = np.array([-260, -25, 38, 180, 0, 0])
+        # self.home_pos_np = np.array([-260, -25, 38, 180, 0, 0])
+        self.home_pos_np = np.array([-310.0000,20.0000,27.0000,180.0000,0.0000,0.0000], dtype=float)
         self.set_trajectories()
         self.trajectories_initialised = False
         self.output = []
@@ -247,7 +248,8 @@ class SystemId:
             sleep(2)
             self.end_video_recording()
             output = np.array(self.output)
-            path = 'output.npz'
+            timestamp = time.strftime("%Y%m%d-%H%M%S")
+            path = f'output_{timestamp}.npz'
             np.savez(
                 path,
                 output=output,
