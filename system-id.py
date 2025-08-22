@@ -147,6 +147,8 @@ class SystemId:
         dy = 180 - 2*r
         d_single = r
         min_y = y - dy
+
+        # og phantom setup - see video on iPhone
         traj_1 = [
             [x, y, z, xr, yr, zr],
             [x, y, z-press_depth, xr, yr, zr],
@@ -172,6 +174,7 @@ class SystemId:
             )
         traj_1 = np.array(traj_1, dtype=float)
 
+        # phantom setup as in traj_1 but the sensor slides along the veins rather than across them
         max_x = x + dx
         traj_2 = [
             [x, y, z, xr, yr, zr],
@@ -198,9 +201,36 @@ class SystemId:
             )
         traj_2 = np.array(traj_2, dtype=float)
 
+        # phantom as in traj_1 but transposed
+        traj_3 = [
+            [x, y, z, xr, yr, zr],
+            [x, y, z-press_depth, xr, yr, zr],
+        ]
+        xy_dirs = [
+            [0, 1],
+            [1, 0],
+            [0, -1],
+            [1, 0]
+        ]
+        xy_i = 0
+        while True:
+            a, b, c, d, e, f = traj_3[-1]
+            if a > max_x + d_single:
+                break
+            x_dir, y_dir = xy_dirs[xy_i]
+            xy_i += 1
+            xy_i %= 4
+            a2 = a + x_dir * d_single
+            b2 = b + y_dir * dy
+            traj_3.append(
+                [a2, b2, c, d, e, f]
+            )
+        traj_3 = np.array(traj_3, dtype=float)
+
         self.trajectories_np = [
             traj_1,
-            traj_2
+            traj_2,
+            traj_3
         ]
         self.trajectories_initialised = True
     
