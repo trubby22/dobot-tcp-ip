@@ -239,10 +239,40 @@ class SystemId:
             )
         traj_3 = np.array(traj_3, dtype=float)
 
-        self.trajectories_np = [
+        self.trajectories = [
             traj_1,
             traj_2,
             traj_3
+        ]
+        self.trajectories_initialised = True
+    
+    def set_trajectories_for_photo(self, press_depth=1, angle=10, slide_length=50):
+        self.home_pos_np = np.array(self.parse_pose(self.d.GetPose()))
+        x, y, z, xr, yr, zr = self.home_pos_np
+        press = [
+            [x, y, z, xr, yr, zr],
+            [x, y, z-press_depth, xr, yr, zr],
+        ]
+        twist_z = [
+            [x, y, z, xr, yr, zr],
+            [x, y, z-press_depth, xr, yr, zr],
+            [x, y, z-press_depth, xr, yr, zr+angle],
+        ]
+        twist_x = [
+            [x, y, z, xr, yr, zr],
+            [x, y, z-press_depth, xr, yr, zr],
+            [x, y, z-press_depth, xr+angle, yr, zr],
+        ]
+        slide = [
+            [x, y, z, xr, yr, zr],
+            [x, y, z-press_depth, xr, yr, zr],
+            [x+slide_length, y, z-press_depth, xr, yr, zr],
+        ]
+        self.trajectories = [
+            press,
+            twist_z,
+            twist_x,
+            slide,
         ]
         self.trajectories_initialised = True
     
@@ -251,11 +281,11 @@ class SystemId:
         t = 0
         while True:
             pose = np.array(self.parse_pose(self.d.GetPose()))
-            with self.frame_lock:
-                data = [self.current_frame_number, *pose]
-                self.output.append(
-                    data
-                )
+            # with self.frame_lock:
+            #     data = [self.current_frame_number, *pose]
+            #     self.output.append(
+            #         data
+            #     )
 
             error_pos = target_pose[:3] - pose[:3]
             error_ori = ((target_pose[3:] - pose[3:] + 180) % 360) - 180
@@ -275,11 +305,11 @@ class SystemId:
     def execute_trajectory(self, trajectory_ix, downward_motion=False, Kp=20.0, v_pos=12.5, v_ori=90):
         if self.trajectories_initialised:
             self.output = []
-            self.start_video_recording()
-            sleep(2)
-            for i in range(len(self.trajectories_np[trajectory_ix])):
+            # self.start_video_recording()
+            # sleep(2)
+            for i in range(len(self.trajectories[trajectory_ix])):
                 self.run_point_servo(
-                    target_pose=self.trajectories_np[trajectory_ix][i],
+                    target_pose=self.trajectories[trajectory_ix][i],
                     v_pos=v_pos,
                     v_ori=v_ori,
                     Kp=Kp,
@@ -287,8 +317,10 @@ class SystemId:
                     threshold_ori=1.0,
                     downward_motion=downward_motion
                 )
-            sleep(2)
-            self.end_video_recording()
+            self.capture_photo()
+            sleep(1)
+            # sleep(2)
+            # self.end_video_recording()
             output = np.array(self.output)
             timestamp = time.strftime("%Y%m%d-%H%M%S")
             path = f'output_{timestamp}.npz'
