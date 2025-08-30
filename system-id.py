@@ -35,9 +35,9 @@ class SystemId:
         print(self.d.Tool(2))
         print(self.d.SetPayload(0.200, 0, 0, 0))
 
-        threading.Thread(target=self.get_feed_small, daemon=True).start()
+        # threading.Thread(target=self.get_feed_small, daemon=True).start()
 
-        self.set_up_video_capture()
+        # self.set_up_video_capture()
 
     def set_up_video_capture(self):
         self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
