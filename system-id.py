@@ -19,9 +19,10 @@ class SystemId:
         self.f = DobotApiFeedBack(ip, feedback_port)
         self.feedback = dict()
 
-        # self.home_pos_np = np.array([-260, -25, 38, 180, 0, 0])
-        self.home_pos_np = np.array([-310.0000,20.0000,27.0000,180.0000,0.0000,0.0000], dtype=float)
-        # self.home_pos_np = np.array([35.7724,274.4154,28.0001,-180.0000,0.0000,0.0000], dtype=float)
+        # home_pos_og = np.array([-260, -25, 38, 180, 0, 0])
+        # home_pos_near_window = np.array([35.7724,274.4154,28.0001,-180.0000,0.0000,0.0000], dtype=float)
+        home_pose_endgame = np.array([-310.0000,20.0000,21.0000,180.0000,0.0000,0.0000])
+        self.home_pose = home_pose_endgame
         self.set_trajectories()
         self.trajectories_initialised = False
         self.output = []
@@ -39,7 +40,7 @@ class SystemId:
         self.set_up_video_capture()
 
     def set_up_video_capture(self):
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc("M", "J", "P", "G"))
         self.cap.set(cv2.CAP_PROP_FPS, 30)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
@@ -48,14 +49,14 @@ class SystemId:
         self.cap.set(cv2.CAP_PROP_CONTRAST, 48)
         self.cap.set(cv2.CAP_PROP_SATURATION, 0)
         self.cap.set(cv2.CAP_PROP_HUE, 0)
-        self.cap.set(cv2.CAP_PROP_SHARPNESS, 3)
+        self.cap.set(cv2.CAP_PROP_SHARPNESS, 6)
         self.cap.set(cv2.CAP_PROP_AUTO_WB, 0)
         self.cap.set(cv2.CAP_PROP_WB_TEMPERATURE, 5000)
         self.cap.set(cv2.CAP_PROP_GAMMA, 100)
         self.cap.set(cv2.CAP_PROP_GAIN, 0)
         self.cap.set(cv2.CAP_PROP_BACKLIGHT, 0)
         self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
-        self.cap.set(cv2.CAP_PROP_EXPOSURE, 100)
+        self.cap.set(cv2.CAP_PROP_EXPOSURE, 80)
         print(f"Actual camera settings:")
         print(
             f"Resolution: {self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)}x{self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)}"
@@ -72,12 +73,9 @@ class SystemId:
         if self.video_thread and self.video_thread.is_alive():
             self.end_video_recording()
             
-        if not self.cap.isOpened():
-            self.set_up_video_capture()
-            
         fourcc = cv2.VideoWriter_fourcc(*"MJPG")
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        output_path = f"robot_video_{timestamp}.avi"
+        output_path = self.get_capture_file_path_extensionless()
+        output_path = f'{output_path}.avi'
         width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = self.cap.get(cv2.CAP_PROP_FPS)
@@ -105,14 +103,20 @@ class SystemId:
                 self.current_frame_number += 1
             self.out.write(frame)
     
+    def get_capture_file_path_extensionless(self):
+        timestamp = time.strftime("%Y-%m-%d-%H-%M-%S")
+        traj_name = self.trajectory_names[self.trajectory_ix]
+        dir = "domain_adaptation"
+        return f"{dir}/{traj_name}_press_depth={self.press_depth}_angle={self.angle}_slide_length={self.slide_length}_timestamp={timestamp}"
+    
     def capture_photo(self):
-        if not self.cap.isOpened():
-            self.set_up_video_capture()
+        for _ in range(30):
+            self.cap.read()
         ret, frame = self.cap.read()
         if not ret:
             raise RuntimeError("Failed to capture photo")
-        timestamp = time.strftime("%Y%m%d-%H%M%S")
-        output_path = f"robot_photo_{timestamp}.jpg"
+        output_path = self.get_capture_file_path_extensionless()
+        output_path = f'{output_path}.jpg'
         cv2.imwrite(output_path, frame)
 
     def parse_pose(self, pose_str):
@@ -150,8 +154,8 @@ class SystemId:
             sleep(0.1)
     
     def set_trajectories(self):
-        self.home_pos_np = np.array(self.parse_pose(self.d.GetPose()))
-        x, y, z, xr, yr, zr = self.home_pos_np
+        self.home_pose = np.array(self.parse_pose(self.d.GetPose()))
+        x, y, z, xr, yr, zr = self.home_pose
         press_depth = 4
         r = 20
         d_short = 105 - 2*r
@@ -247,8 +251,11 @@ class SystemId:
         self.trajectories_initialised = True
     
     def set_trajectories_for_photo(self, press_depth=1, angle=10, slide_length=50):
-        self.home_pos_np = np.array(self.parse_pose(self.d.GetPose()))
-        x, y, z, xr, yr, zr = self.home_pos_np
+        self.press_depth = press_depth
+        self.angle = angle
+        self.slide_length = slide_length
+        self.home_pose = np.array(self.parse_pose(self.d.GetPose()))
+        x, y, z, xr, yr, zr = self.home_pose
         press = [
             [x, y, z, xr, yr, zr],
             [x, y, z-press_depth, xr, yr, zr],
@@ -266,13 +273,19 @@ class SystemId:
         slide = [
             [x, y, z, xr, yr, zr],
             [x, y, z-press_depth, xr, yr, zr],
-            [x+slide_length, y, z-press_depth, xr, yr, zr],
+            [x, y-slide_length, z-press_depth, xr, yr, zr],
         ]
         self.trajectories = [
             press,
             twist_z,
             twist_x,
             slide,
+        ]
+        self.trajectory_names = [
+            'press',
+            'twist_z',
+            'twist_x',
+            'slide',
         ]
         self.trajectories_initialised = True
     
@@ -302,11 +315,14 @@ class SystemId:
             sleep(0.030)
             t += 1
     
-    def execute_trajectory(self, trajectory_ix, downward_motion=False, Kp=20.0, v_pos=12.5, v_ori=90):
+    def execute_trajectory(self, trajectory_ix, downward_motion=False, Kp=20.0, v_pos=20, v_ori=90, prep_time=5):
         if self.trajectories_initialised:
             self.output = []
-            # self.start_video_recording()
-            # sleep(2)
+            self.trajectory_ix = trajectory_ix
+            if self.trajectory_names[self.trajectory_ix] == 'slide':
+                sleep(prep_time)
+                self.start_video_recording()
+                sleep(1)
             for i in range(len(self.trajectories[trajectory_ix])):
                 self.run_point_servo(
                     target_pose=self.trajectories[trajectory_ix][i],
@@ -317,22 +333,25 @@ class SystemId:
                     threshold_ori=1.0,
                     downward_motion=downward_motion
                 )
-            self.capture_photo()
-            sleep(1)
-            # sleep(2)
-            # self.end_video_recording()
-            output = np.array(self.output)
-            timestamp = time.strftime("%Y%m%d-%H%M%S")
-            path = f'output_{timestamp}.npz'
-            np.savez(
-                path,
-                output=output,
-            )
+            if self.trajectory_names[self.trajectory_ix] == 'slide':
+                self.end_video_recording()
+            else:
+                sleep(0.5)
+                self.capture_photo()
+                sleep(0.5)
+            s.run_home_pos()
+            # output = np.array(self.output)
+            # timestamp = time.strftime("%Y%m%d-%H%M%S")
+            # path = f'output_{timestamp}.npz'
+            # np.savez(
+            #     path,
+            #     output=output,
+            # )
         else:
             print("you need to set_trajectories")
 
     def run_home_pos(self):
-        self.run_point(self.d.MovJ(*self.home_pos_np.tolist(), coordinateMode=0, v=20))
+        self.run_point(self.d.MovJ(*self.home_pose.tolist(), coordinateMode=0, v=20))
         print('home position reached!')
         print()
     
