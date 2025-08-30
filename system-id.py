@@ -104,6 +104,16 @@ class SystemId:
             with self.frame_lock:
                 self.current_frame_number += 1
             self.out.write(frame)
+    
+    def capture_photo(self):
+        if not self.cap.isOpened():
+            self.set_up_video_capture()
+        ret, frame = self.cap.read()
+        if not ret:
+            raise RuntimeError("Failed to capture photo")
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        output_path = f"robot_photo_{timestamp}.jpg"
+        cv2.imwrite(output_path, frame)
 
     def parse_pose(self, pose_str):
         pose_part = pose_str.split('{')[1].split('}')[0]
