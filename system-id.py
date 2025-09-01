@@ -39,6 +39,7 @@ class SystemId:
         self.trajectories_initialised = False
         self.output = []
         self.calibrated = False
+        self.video_capture_set_up = False
 
         print(self.d.RequestControl())
         print(self.d.EnableRobot())
@@ -52,7 +53,7 @@ class SystemId:
 
         # self.set_up_video_capture()
 
-    def set_up_video_capture(self):
+    def set_up_video_capture(self, exposure):
         self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc("M", "J", "P", "G"))
         self.cap.set(cv2.CAP_PROP_FPS, 30)
@@ -69,7 +70,7 @@ class SystemId:
         self.cap.set(cv2.CAP_PROP_GAIN, 0)
         self.cap.set(cv2.CAP_PROP_BACKLIGHT, 0)
         self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
-        self.cap.set(cv2.CAP_PROP_EXPOSURE, 80)
+        self.cap.set(cv2.CAP_PROP_EXPOSURE, int(exposure))
         print(f"Actual camera settings:")
         print(
             f"Resolution: {self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)}x{self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)}"
@@ -81,6 +82,7 @@ class SystemId:
         self.current_frame_number = 0
         self.video_thread = None
         self.recording = False
+        self.video_capture_set_up = True
 
     def start_video_recording(self):
         if self.video_thread and self.video_thread.is_alive():
@@ -415,9 +417,13 @@ class SystemId:
         else:
             print("you need to set_trajectories")
     
-    def execute_endgame_trajectories(self, downward_motion=False, Kp=20.0, v_pos=20, v_ori=90, prep_time=5):
-        if not self.trajectories_initialised or not self.calibrate:
-            print("you need to calibrate and set trajectories")
+    def execute_endgame_trajectories(self, downward_motion=False, Kp=20.0, v_pos=25, v_ori=90, prep_time=5):
+        if (
+            not self.trajectories_initialised or 
+            not self.calibrate or
+            not self.video_capture_set_up
+        ):
+            print("you need to set up video capture, calibrate and set trajectories")
             return
 
         timestamp = time.strftime("%Y%m%d-%H%M%S")
