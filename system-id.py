@@ -4,6 +4,7 @@ import re
 from time import sleep
 import numpy as np
 import IPython
+from pathlib import Path
 
 import cv2
 import time
@@ -21,11 +22,23 @@ class SystemId:
 
         # home_pos_og = np.array([-260, -25, 38, 180, 0, 0])
         # home_pos_near_window = np.array([35.7724,274.4154,28.0001,-180.0000,0.0000,0.0000], dtype=float)
-        home_pose_endgame = np.array([-310.0000,20.0000,21.0000,180.0000,0.0000,0.0000])
+        home_pose_endgame = np.array([-310.0000,20.0000,60.0000,180.0000,0.0000,0.0000])
+        phantom_vertices = np.array([
+            [-245.0000,46.0000,30.0000,180.0000,0.0000,0.0000],
+            [-245.0000,-54.0000,30.0000,180.0000,0.0000,0.0000],
+            [-425.0000,-54.0000,30.0000,180.0000,0.0000,0.0000],
+            [-425.0000,46.0000,30.0000,180.0000,0.0000,0.0000],
+        ], dtype=float)
+        phantom_upper_surface_z = 20.5000
+        self.dx = 180
+        self.dy = 100
+        self.r = 20
+        self.ori = np.array([180, 0, 0], dtype=float)
         self.home_pose = home_pose_endgame
         self.set_trajectories()
         self.trajectories_initialised = False
         self.output = []
+        self.calibrated = False
 
         print(self.d.RequestControl())
         print(self.d.EnableRobot())
@@ -74,8 +87,7 @@ class SystemId:
             self.end_video_recording()
             
         fourcc = cv2.VideoWriter_fourcc(*"MJPG")
-        output_path = self.get_capture_file_path_extensionless()
-        output_path = f'{output_path}.avi'
+        output_path = f'{self.path}.avi'
         width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         fps = self.cap.get(cv2.CAP_PROP_FPS)
@@ -288,17 +300,70 @@ class SystemId:
             'slide',
         ]
         self.trajectories_initialised = True
+
+    def calibrate(self, x, y, z):
+        self.vx = x
+        self.vy = y
+        self.vz = z
+        self.calibrated = True
+
+    def set_trajectories_for_endgame(self):
+        if not self.calibrated:
+            print("you need to calibrate first")
+            return
+        x0 = self.vx
+        y0 = self.vy
+        z0 = self.vz
+        x1 = x0-self.dx
+        y1 = y0-self.dy
+        z1 = z0-3
+        k = 5
+        xs = np.linspace(x0-self.r, x1+self.r, k, endpoint=True)
+        ys = np.array([y0+self.r, y1-self.r], dtype=float)
+        trajectories = []
+        metadata_all = []
+        for i in range(xs.shape[0]):
+            x = xs[i]
+            trajectory = [
+                [x, ys[0], z0],
+                [x, ys[0], z1],
+                [x, ys[1], z1],
+                [x, ys[1], z0],
+            ]
+            metadata = [
+                i, 0, self.vx, self.vy, self.vz,
+            ]
+            trajectories.append(trajectory)
+            metadata_all.append(metadata)
+            trajectory = [
+                [x, ys[1], z0],
+                [x, ys[1], z1],
+                [x, ys[0], z1],
+                [x, ys[0], z0],
+            ]
+            metadata = [
+                i, 1, self.vx, self.vy, self.vz,
+            ]
+            trajectories.append(trajectory)
+            metadata_all.append(metadata)
+        trajectories = np.array(trajectories, dtype=float)
+        self.metadata = np.array(metadata_all, dtype=float)
+
+        orientation_broadcast = np.broadcast_to(self.ori, trajectories.shape)
+        self.trajectories = np.concatenate([trajectories, orientation_broadcast], axis=-1)
+
+        self.trajectories_initialised = True
     
     def run_point_servo(self, target_pose, v_pos, v_ori, Kp, threshold_pos, threshold_ori, downward_motion=False):
         target_pose = np.array(target_pose)
         t = 0
         while True:
             pose = np.array(self.parse_pose(self.d.GetPose()))
-            # with self.frame_lock:
-            #     data = [self.current_frame_number, *pose]
-            #     self.output.append(
-            #         data
-            #     )
+            with self.frame_lock:
+                data = [self.current_frame_number, *pose]
+                self.output.append(
+                    data
+                )
 
             error_pos = target_pose[:3] - pose[:3]
             error_ori = ((target_pose[3:] - pose[3:] + 180) % 360) - 180
@@ -349,6 +414,43 @@ class SystemId:
             # )
         else:
             print("you need to set_trajectories")
+    
+    def execute_endgame_trajectories(self, downward_motion=False, Kp=20.0, v_pos=20, v_ori=90, prep_time=5):
+        if not self.trajectories_initialised or not self.calibrate:
+            print("you need to calibrate and set trajectories")
+            return
+
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        dir_path = f'endgame/{timestamp}'
+        Path(dir_path).mkdir(parents=True, exist_ok=True)
+        sleep(prep_time)
+        for i in range(self.trajectories.shape[0]):
+            metadata = self.metadata[i]
+            a, b = metadata[:2]
+            self.path = f'{dir_path}/metadata_{a}_{b}'
+
+            self.output = []
+            self.trajectory_ix = i
+            self.start_video_recording()
+            sleep(1)
+            for j in range(self.trajectories.shape[1]):
+                self.run_point_servo(
+                    target_pose=self.trajectories[i][j],
+                    v_pos=v_pos,
+                    v_ori=v_ori,
+                    Kp=Kp,
+                    threshold_pos=0.1,
+                    threshold_ori=1.0,
+                    downward_motion=downward_motion
+                )
+            self.end_video_recording()
+            output = np.array(self.output)
+            path = f'{self.path}.npz'
+            np.savez(
+                path,
+                output=output,
+                metadata=metadata,
+            )
 
     def run_home_pos(self):
         self.run_point(self.d.MovJ(*self.home_pose.tolist(), coordinateMode=0, v=20))
