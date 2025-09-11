@@ -49,7 +49,7 @@ class SystemId:
         print(self.d.Tool(2))
         print(self.d.SetPayload(0.200, 0, 0, 0))
 
-        # threading.Thread(target=self.get_feed_small, daemon=True).start()
+        threading.Thread(target=self.get_feed_small, daemon=True).start()
 
         # self.set_up_video_capture()
 
@@ -386,7 +386,7 @@ class SystemId:
         if self.trajectories_initialised:
             self.output = []
             self.trajectory_ix = trajectory_ix
-            if self.trajectory_names[self.trajectory_ix] == 'slide':
+            if False and self.trajectory_names[self.trajectory_ix] == 'slide':
                 sleep(prep_time)
                 self.start_video_recording()
                 sleep(1)
@@ -400,7 +400,7 @@ class SystemId:
                     threshold_ori=1.0,
                     downward_motion=downward_motion
                 )
-            if self.trajectory_names[self.trajectory_ix] == 'slide':
+            if False and self.trajectory_names[self.trajectory_ix] == 'slide':
                 self.end_video_recording()
             else:
                 sleep(0.5)
