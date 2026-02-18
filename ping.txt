@@ -1,0 +1,6 @@
+ip a
+<iface> is e.g. enp1s0
+sudo ip addr flush dev <iface>
+sudo ip addr add 192.168.5.2/24 dev <iface>
+sudo ip link set <iface> up
+ping 192.168.5.1
