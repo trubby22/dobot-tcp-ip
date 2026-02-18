@@ -1,6 +1,9 @@
 from dobot_api import DobotApiFeedBack,DobotApiDashboard
 import IPython
 
+POSE = 0
+JOINT = 1
+
 ip = '192.168.5.1'
 dashboard_port = 29_999
 feedback_port = 30_004
