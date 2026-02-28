@@ -10,6 +10,9 @@ import cv2
 import time
 import threading
 
+POSE = 0
+JOINT = 1
+
 
 class SystemId:
     def __init__(self):
@@ -309,6 +312,13 @@ class SystemId:
         self.vz = z
         self.calibrated = True
 
+    def iros_calibrate(self, coords):
+        arr = np.array(coords, dtype=float)
+        if arr.shape[0] != 6:
+            raise ValueError("iros_calibrate expects 6 values: [x,y,z,xr,yr,zr]")
+        self.iros_A = arr
+        print(f"Set iros start position A to: {self.iros_A}")
+
     def set_trajectories_for_endgame(self):
         if not self.calibrated:
             print("you need to calibrate first")
@@ -355,6 +365,62 @@ class SystemId:
         self.trajectories = np.concatenate([trajectories, orientation_broadcast], axis=-1)
 
         self.trajectories_initialised = True
+
+    def iros(self):
+        if not hasattr(self, 'iros_A'):
+            print("Call iros_calibrate([x,y,z,xr,yr,zr]) first to set point A")
+            return
+
+        if not getattr(self, 'video_capture_set_up', False):
+            self.set_up_video_capture(100)
+
+        dir_path = "/home/psb120/Documents/dobot-tcp-ip/iros"
+        Path(dir_path).mkdir(parents=True, exist_ok=True)
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        base = f"{dir_path}/{timestamp}"
+
+        A = np.array(self.iros_A, dtype=float)
+
+        resp = self.d.MovJ(*A.tolist(), coordinateMode=POSE, v=20, user=0, tool=2)
+        self.run_point(resp)
+
+        B = A + np.array([0, -100, 0, 0, 0, 0], dtype=float)
+
+        self.path = base
+        self.start_video_recording()
+        sleep(1)
+
+        resp = self.d.MovJ(*B.tolist(), coordinateMode=POSE, v=20, user=0, tool=2)
+        cmd_id = self.parse_command_id(resp)
+
+        kinematics = []
+        while True:
+            pose = np.array(self.parse_pose(self.d.GetPose()))
+            with getattr(self, 'frame_lock', threading.Lock()):
+                fn = getattr(self, 'current_frame_number', 0)
+            kinematics.append([fn, *pose.tolist()])
+
+            if cmd_id == -1 or (self.feedback.get('RobotMode') == 5 and self.feedback.get('CurrentCommandId') == cmd_id):
+                break
+            sleep(0.03)
+
+        self.end_video_recording()
+
+        kinematics_arr = np.array(kinematics, dtype=float)
+        np.savez(f"{base}.npz", kinematics=kinematics_arr)
+
+        C = B + np.array([100, 0, 0, 0, 0, 0], dtype=float)
+        D = A + np.array([0, 100, 0, 0, 0, 0], dtype=float)
+
+        resp = self.d.MovJ(*C.tolist(), coordinateMode=POSE, v=20, user=0, tool=2)
+        self.run_point(resp)
+
+        resp = self.d.MovJ(*D.tolist(), coordinateMode=POSE, v=20, user=0, tool=2)
+        self.run_point(resp)
+
+        resp = self.d.MovJ(*A.tolist(), coordinateMode=POSE, v=20, user=0, tool=2)
+        self.run_point(resp)
+        print("IROS routine complete. Video and kinematics saved with base:", base)
     
     def run_point_servo(self, target_pose, v_pos, v_ori, Kp, threshold_pos, threshold_ori, downward_motion=False):
         target_pose = np.array(target_pose)
@@ -459,12 +525,12 @@ class SystemId:
             )
 
     def run_home_pos(self):
-        self.run_point(self.d.MovJ(*self.home_pose.tolist(), coordinateMode=0, v=20))
+        self.run_point(self.d.MovJ(*self.home_pose.tolist(), coordinateMode=POSE, v=20))
         print('home position reached!')
         print()
     
     def run_upright_pos(self):
-        self.run_point(self.d.MovJ(*np.zeros(shape=(6,)).tolist(), coordinateMode=1, v=20))
+        self.run_point(self.d.MovJ(*np.zeros(shape=(6,)).tolist(), coordinateMode=JOINT, v=20))
         print('home position reached!')
         print()
 
