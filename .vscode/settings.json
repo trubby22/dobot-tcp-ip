@@ -1,0 +1,4 @@
+{
+    "python.defaultInterpreterPath": "/home/psb120/micromamba/envs/dobot/bin/python",
+    "python-envs.defaultEnvManager": "ms-python.python:system"
+}

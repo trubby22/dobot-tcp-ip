@@ -57,7 +57,14 @@ class SystemId:
         # self.set_up_video_capture()
 
     def set_up_video_capture(self, exposure):
-        self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+        self.cap = cv2.VideoCapture(1, cv2.CAP_V4L2)
+        if not self.cap.isOpened():
+             print("Warning: Could not open camera at index 1, trying index 0...")
+             self.cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+             if not self.cap.isOpened():
+                 print("Error: Could not open camera at index 0 or 1.")
+                 return
+        
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc("M", "J", "P", "G"))
         self.cap.set(cv2.CAP_PROP_FPS, 30)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
@@ -91,6 +98,10 @@ class SystemId:
         if self.video_thread and self.video_thread.is_alive():
             self.end_video_recording()
             
+        if not hasattr(self, 'cap') or not self.cap.isOpened():
+            print("Error: Video capture not initialized or camera not open.")
+            return
+
         fourcc = cv2.VideoWriter_fourcc(*"MJPG")
         output_path = f'{self.path}.avi'
         width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -312,13 +323,6 @@ class SystemId:
         self.vz = z
         self.calibrated = True
 
-    def iros_calibrate(self, coords):
-        arr = np.array(coords, dtype=float)
-        if arr.shape[0] != 6:
-            raise ValueError("iros_calibrate expects 6 values: [x,y,z,xr,yr,zr]")
-        self.iros_A = arr
-        print(f"Set iros start position A to: {self.iros_A}")
-
     def set_trajectories_for_endgame(self):
         if not self.calibrated:
             print("you need to calibrate first")
@@ -366,6 +370,13 @@ class SystemId:
 
         self.trajectories_initialised = True
 
+    def iros_calibrate(self, coords=[0, -220, 30, 180, 0, 90]):
+        arr = np.array(coords, dtype=float)
+        if arr.shape[0] != 6:
+            raise ValueError("iros_calibrate expects 6 values: [x,y,z,xr,yr,zr]")
+        self.iros_A = arr
+        print(f"Set iros start position A to: {self.iros_A}")
+
     def iros(self):
         if not hasattr(self, 'iros_A'):
             print("Call iros_calibrate([x,y,z,xr,yr,zr]) first to set point A")
@@ -378,19 +389,23 @@ class SystemId:
         Path(dir_path).mkdir(parents=True, exist_ok=True)
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         base = f"{dir_path}/{timestamp}"
+        user_id = 0
+        tool_id = 2
+        v_iros = 10
+        y_dist = 130
 
         A = np.array(self.iros_A, dtype=float)
 
-        resp = self.d.MovJ(*A.tolist(), coordinateMode=POSE, v=20, user=0, tool=2)
+        resp = self.d.MovJ(*A.tolist(), coordinateMode=POSE, v=v_iros, user=user_id, tool=tool_id)
         self.run_point(resp)
 
-        B = A + np.array([0, -100, 0, 0, 0, 0], dtype=float)
+        B = A + np.array([0, -y_dist, 0, 0, 0, 0], dtype=float)
 
         self.path = base
         self.start_video_recording()
         sleep(1)
 
-        resp = self.d.MovJ(*B.tolist(), coordinateMode=POSE, v=20, user=0, tool=2)
+        resp = self.d.MovL(*B.tolist(), coordinateMode=POSE, v=v_iros, user=user_id, tool=tool_id)
         cmd_id = self.parse_command_id(resp)
 
         kinematics = []
@@ -409,16 +424,16 @@ class SystemId:
         kinematics_arr = np.array(kinematics, dtype=float)
         np.savez(f"{base}.npz", kinematics=kinematics_arr)
 
-        C = B + np.array([100, 0, 0, 0, 0, 0], dtype=float)
-        D = A + np.array([0, 100, 0, 0, 0, 0], dtype=float)
+        C = B + np.array([0, 0, 100, 0, 0, 0], dtype=float)
+        D = C + np.array([0, y_dist, 0, 0, 0, 0], dtype=float)
 
-        resp = self.d.MovJ(*C.tolist(), coordinateMode=POSE, v=20, user=0, tool=2)
+        resp = self.d.MovJ(*C.tolist(), coordinateMode=POSE, v=v_iros, user=user_id, tool=tool_id)
         self.run_point(resp)
 
-        resp = self.d.MovJ(*D.tolist(), coordinateMode=POSE, v=20, user=0, tool=2)
+        resp = self.d.MovJ(*D.tolist(), coordinateMode=POSE, v=v_iros, user=user_id, tool=tool_id)
         self.run_point(resp)
 
-        resp = self.d.MovJ(*A.tolist(), coordinateMode=POSE, v=20, user=0, tool=2)
+        resp = self.d.MovJ(*A.tolist(), coordinateMode=POSE, v=v_iros, user=user_id, tool=tool_id)
         self.run_point(resp)
         print("IROS routine complete. Video and kinematics saved with base:", base)
     
