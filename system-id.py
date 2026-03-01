@@ -370,7 +370,7 @@ class SystemId:
 
         self.trajectories_initialised = True
 
-    def iros_calibrate(self, coords=[0, -220, 30, 180, 0, 90]):
+    def iros_calibrate(self, coords=[0, -220, 32, 180, 0, 90]):
         arr = np.array(coords, dtype=float)
         if arr.shape[0] != 6:
             raise ValueError("iros_calibrate expects 6 values: [x,y,z,xr,yr,zr]")
@@ -405,7 +405,7 @@ class SystemId:
         self.start_video_recording()
         sleep(1)
 
-        resp = self.d.MovL(*B.tolist(), coordinateMode=POSE, v=v_iros, user=user_id, tool=tool_id)
+        resp = self.d.MovL(*B.tolist(), coordinateMode=POSE, speed=10, user=user_id, tool=tool_id)
         cmd_id = self.parse_command_id(resp)
 
         kinematics = []
@@ -430,7 +430,7 @@ class SystemId:
         resp = self.d.MovJ(*C.tolist(), coordinateMode=POSE, v=v_iros, user=user_id, tool=tool_id)
         self.run_point(resp)
 
-        resp = self.d.MovJ(*D.tolist(), coordinateMode=POSE, v=v_iros, user=user_id, tool=tool_id)
+        resp = self.d.MovJ(*D.tolist(), coordinateMode=POSE, v=20, user=user_id, tool=tool_id)
         self.run_point(resp)
 
         resp = self.d.MovJ(*A.tolist(), coordinateMode=POSE, v=v_iros, user=user_id, tool=tool_id)
