@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 
-DEFAULT_PATH = '/home/psb120/Documents/dobot-tcp-ip/iros/20260228-221619.npz'
+DEFAULT_PATH = '/home/psb120/Documents/dobot-tcp-ip/iros/20260228-230937.npz'
 
 def main(path=DEFAULT_PATH):
 	d = np.load(path, allow_pickle=True)
